@@ -9,15 +9,15 @@ from fastapi.responses import JSONResponse
 import gdown
 import pickle
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from mangum import Mangum  # AWS Lambda Adapter
 
-# Initialize FastAPI app
 app = FastAPI()
 
 # ================== PLANT DISEASE DETECTION ==================
 
-# Model paths
-MODEL_PATH = "plant_disease_prediction_model.h5"
-CLASS_INDICES_PATH = "class_indices.json"
+# Use /tmp/ directory for Lambda compatibility
+MODEL_PATH = "/tmp/plant_disease_prediction_model.h5"
+CLASS_INDICES_PATH = "/tmp/class_indices.json"
 
 # Google Drive file ID
 file_id = '18tfFcyf9DgK_r7cPIMPDDmPB7IT0-NIp'
@@ -55,14 +55,22 @@ async def classify_image(file: UploadFile = File(...)):
     prediction = predict_plant_disease(image_data)
     return JSONResponse(content={"prediction": prediction})
 
+
 # ================== CROP & FERTILIZER RECOMMENDATION ==================
 
+# Use /tmp/ for model files
+fertilizer_model_path = "/tmp/classifier.pkl"
+fertilizer_info_path = "/tmp/fertilizer.pkl"
+crop_model_path = "/tmp/model.pkl"
+scaler_standard_path = "/tmp/standscaler.pkl"
+scaler_minmax_path = "/tmp/minmaxscaler.pkl"
+
 # Load models and scalers
-fertilizer_model = pickle.load(open('classifier.pkl', 'rb'))
-fertilizer_info = pickle.load(open('fertilizer.pkl', 'rb'))
-crop_model = pickle.load(open('model.pkl', 'rb'))
-scaler_standard = pickle.load(open('standscaler.pkl', 'rb'))
-scaler_minmax = pickle.load(open('minmaxscaler.pkl', 'rb'))
+fertilizer_model = pickle.load(open(fertilizer_model_path, 'rb'))
+fertilizer_info = pickle.load(open(fertilizer_info_path, 'rb'))
+crop_model = pickle.load(open(crop_model_path, 'rb'))
+scaler_standard = pickle.load(open(scaler_standard_path, 'rb'))
+scaler_minmax = pickle.load(open(scaler_minmax_path, 'rb'))
 
 @app.post("/fertilizer/predict")
 async def predict_fertilizer(data: dict):
@@ -93,6 +101,5 @@ async def predict_crop(data: dict):
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# AWS Lambda Adapter
+handler = Mangum(app)
